@@ -112,6 +112,87 @@ class Trainer(object):
         # Set model in training mode.
         self.model.train()
 
+    def train_from_data(self, batch, train_steps):
+        """
+        The main training loops.
+        by iterating over training data (i.e. `train_iter_fct`)
+        and running validation (i.e. iterating over `valid_iter_fct`
+
+        Args:
+            train_iter_fct(function): a function that returns the train
+                iterator. e.g. something like
+                train_iter_fct = lambda: generator(*args, **kwargs)
+            valid_iter_fct(function): same as train_iter_fct, for valid data
+            train_steps(int):
+            valid_steps(int):
+            save_checkpoint_steps(int):
+
+        Return:
+            None
+        """
+        logger.info('Start training...')
+
+        step = 0
+        i = 1
+        true_batchs = []
+        accum = 0
+        normalization = 0
+        total_stats = onmt.utils.Statistics()
+        report_stats = onmt.utils.Statistics()
+        self._start_report_manager(start_time=total_stats.start_time)
+        while step <= train_steps:
+            reduce_counter = 0
+            # TODO: Hardcoded True
+            if True or self.n_gpu == 0 or (i % self.n_gpu == self.gpu_rank):
+                if self.gpu_verbose_level > 1:
+                    logger.info("GpuRank %d: index: %d accum: %d"
+                                % (self.gpu_rank, i, accum))
+
+                true_batchs.append(batch)
+
+                if self.norm_method == "tokens":
+                    num_tokens = batch.tgt[1:].ne(
+                        self.train_loss.padding_idx).sum()
+                    normalization += num_tokens.item()
+                else:
+                    normalization += batch.batch_size
+                accum += 1
+                if accum == self.grad_accum_count:
+                    reduce_counter += 1
+                    if self.gpu_verbose_level > 0:
+                        logger.info("GpuRank %d: reduce_counter: %d \
+                                    n_minibatch %d"
+                                    % (self.gpu_rank, reduce_counter,
+                                       len(true_batchs)))
+                    if self.n_gpu > 1:
+                        normalization = sum(onmt.utils.distributed
+                                            .all_gather_list
+                                            (normalization))
+
+                    self._gradient_accumulation(
+                        true_batchs, normalization, total_stats,
+                        report_stats)
+
+                    report_stats = self._maybe_report_training(
+                        step, train_steps,
+                        self.optim.learning_rate,
+                        report_stats)
+
+                    true_batchs = []
+                    accum = 0
+                    normalization = 0
+                    if self.gpu_rank == 0:
+                        self._maybe_save(step)
+                    step += 1
+                    if step > train_steps:
+                        break
+            if self.gpu_verbose_level > 0:
+                logger.info('GpuRank %d: we completed an epoch \
+                            at step %d' % (self.gpu_rank, step))
+
+        return total_stats
+
+
     def train(self, train_iter_fct, valid_iter_fct, train_steps, valid_steps):
         """
         The main training loops.

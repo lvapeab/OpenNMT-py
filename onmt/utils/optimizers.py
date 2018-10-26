@@ -9,7 +9,7 @@ from onmt.utils import use_gpu
 def build_optim(model, opt, checkpoint):
     """ Build optimizer """
     saved_optimizer_state_dict = None
-
+    print "Opt", opt
     if opt.train_from and opt.reset_optim != 'all':
         optim = checkpoint['optim']
         # We need to save a copy of optim.optimizer.state_dict() for setting
@@ -78,6 +78,10 @@ def build_optim(model, opt, checkpoint):
             raise RuntimeError(
                 "Error: loaded Adam optimizer from existing model" +
                 " but optimizer state is empty")
+
+    # TODO: Remove this
+    # optim._set_rate(1000)
+    # print ("Optimizer:", optim.method, "lr:", optim.learning_rate)
 
     return optim
 
