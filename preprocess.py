@@ -4,7 +4,7 @@
     Pre-process Data / features files and build vocabulary
 """
 
-import argparse
+import configargparse
 import glob
 import sys
 import gc
@@ -32,10 +32,12 @@ def check_existing_pt_files(opt):
 
 def parse_args():
     """ Parsing arguments """
-    parser = argparse.ArgumentParser(
+    parser = configargparse.ArgumentParser(
         description='preprocess.py',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        config_file_parser_class=configargparse.YAMLConfigFileParser,
+        formatter_class=configargparse.ArgumentDefaultsHelpFormatter)
 
+    opts.config_opts(parser)
     opts.add_md_help_argument(parser)
     opts.preprocess_opts(parser)
 
@@ -64,6 +66,9 @@ def build_save_in_shards_using_shards_size(src_corpus, tgt_corpus, fields,
                         % (src_corpus, tgt_corpus))
             src_data = fsrc.readlines()
             tgt_data = ftgt.readlines()
+            if len(src_data) != len(tgt_data):
+                raise AssertionError("Source and Target should \
+                                     have the same length")
 
             num_shards = int(len(src_data) / opt.shard_size)
             for x in range(num_shards):

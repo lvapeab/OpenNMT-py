@@ -2,8 +2,8 @@
 """
     Main training workflow
 """
-from __future__ import division
-import argparse
+
+import configargparse
 import os
 import signal
 import torch
@@ -25,7 +25,7 @@ def main(opt):
     if opt.truncated_decoder > 0 and opt.accum_count > 1:
         raise AssertionError("BPTT is not compatible with -accum > 1")
 
-    if len(opt.gpuid) > 1:
+    if opt.gpuid:
         raise AssertionError("gpuid is deprecated \
               see world_size and gpu_ranks")
 
@@ -106,10 +106,12 @@ class ErrorHandler(object):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
+    parser = configargparse.ArgumentParser(
         description='train.py',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        config_file_parser_class=configargparse.YAMLConfigFileParser,
+        formatter_class=configargparse.ArgumentDefaultsHelpFormatter)
 
+    opts.config_opts(parser)
     opts.add_md_help_argument(parser)
     opts.model_opts(parser)
     opts.train_opts(parser)

@@ -2,9 +2,9 @@
 """
     Training on a single process
 """
-from __future__ import division
 
-import argparse
+import configargparse
+
 import os
 import random
 import torch
@@ -90,7 +90,16 @@ def main(opt, device_id):
         logger.info('Loading checkpoint from %s' % opt.train_from)
         checkpoint = torch.load(opt.train_from,
                                 map_location=lambda storage, loc: storage)
-        model_opt = checkpoint['opt']
+
+        # Load default opts values then overwrite it with opts from
+        # the checkpoint. It's usefull in order to re-train a model
+        # after adding a new option (not set in checkpoint)
+        dummy_parser = configargparse.ArgumentParser()
+        opts.model_opts(dummy_parser)
+        default_opt = dummy_parser.parse_known_args([])[0]
+
+        model_opt = default_opt
+        model_opt.__dict__.update(checkpoint['opt'].__dict__)
     else:
         checkpoint = None
         model_opt = opt
@@ -137,6 +146,10 @@ def main(opt, device_id):
         lazily_load_dataset("valid", opt), fields, opt, is_train=False)
 
     # Do training.
+    if len(opt.gpu_ranks):
+        logger.info('Starting training on GPU: %s' % opt.gpu_ranks)
+    else:
+        logger.info('Starting training on CPU, could be very slow')
     trainer.train(train_iter_fct, valid_iter_fct, opt.train_steps,
                   opt.valid_steps)
 
@@ -145,9 +158,9 @@ def main(opt, device_id):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
+    parser = configargparse.ArgumentParser(
         description='train.py',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        formatter_class=configargparse.ArgumentDefaultsHelpFormatter)
 
     opts.add_md_help_argument(parser)
     opts.model_opts(parser)

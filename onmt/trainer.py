@@ -9,8 +9,6 @@
           users of this library) for the strategy things we do.
 """
 
-from __future__ import division
-
 import onmt.inputters as inputters
 import onmt.utils
 
@@ -316,7 +314,7 @@ class Trainer(object):
             tgt = inputters.make_features(batch, 'tgt')
 
             # F-prop through the model.
-            outputs, attns, _ = self.model(src, tgt, src_lengths)
+            outputs, attns = self.model(src, tgt, src_lengths)
 
             # Compute loss.
             batch_stats = self.valid_loss.monolithic_compute_loss(
@@ -343,7 +341,7 @@ class Trainer(object):
             else:
                 trunc_size = target_size
 
-            dec_state = None
+            # dec_state = None
             src = inputters.make_features(batch, 'src', self.data_type)
             if self.data_type == 'text':
                 _, src_lengths = batch.src
@@ -362,8 +360,8 @@ class Trainer(object):
                 # 2. F-prop all but generator.
                 if self.grad_accum_count == 1:
                     self.model.zero_grad()
-                outputs, attns, dec_state = \
-                    self.model(src, tgt, src_lengths, dec_state)
+                outputs, attns = \
+                    self.model(src, tgt, src_lengths)
 
                 # 3. Compute loss in shards for memory efficiency.
                 batch_stats = self.train_loss.sharded_compute_loss(
@@ -384,8 +382,11 @@ class Trainer(object):
                     self.optim.step()
 
                 # If truncated, don't backprop fully.
-                if dec_state is not None:
-                    dec_state.detach()
+                # TO CHECK
+                # if dec_state is not None:
+                #    dec_state.detach()
+                if self.model.decoder.state is not None:
+                    self.model.decoder.detach_state()
 
         # in case of multi step gradient accumulation,
         # update only after accum batches
